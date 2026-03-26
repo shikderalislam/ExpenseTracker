@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>TakaTrack – Smart Expense Manager</title>
 <link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+
+<!-- ══════════════════════════════════════════════
+  SUPABASE CONFIG — Replace these two values:
+  1. Go to https://supabase.com → New Project
+  2. Settings → API → copy Project URL & anon key
+  ══════════════════════════════════════════════ -->
+<script>
+  const SUPABASE_URL  = 'YOUR_SUPABASE_URL';   // e.g. https://xxxx.supabase.co
+  const SUPABASE_ANON = 'YOUR_SUPABASE_ANON_KEY';
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <style>
 :root{
   --bg:#07080d;--s1:#0f1118;--s2:#161b27;--s3:#1e2535;--border:#252d3d;
@@ -14,121 +26,149 @@
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;min-height:100vh;overflow-x:hidden}
-h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
-#app{max-width:480px;margin:0 auto;min-height:100vh}
-.page{display:none;min-height:100vh;padding-bottom:90px;animation:fadeUp .3s ease}
-.page.active{display:block}
-/* onboarding overrides page defaults — handled by its own #page-onboard rules */
-#page-onboard{padding-bottom:0}
-@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 
-/* ONBOARDING — fullscreen, no scroll */
-#page-onboard{
-  position:fixed;inset:0;z-index:999;
+/* ── APP SHELL ── */
+#app{max-width:480px;margin:0 auto;min-height:100vh;position:relative}
+.screen{display:none;animation:fadeUp .3s ease}
+.screen.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── FULLSCREEN OVERLAY SCREENS ── */
+.fs-screen{
+  position:fixed;inset:0;z-index:900;
   display:none;flex-direction:column;align-items:center;justify-content:center;
-  height:100%;overflow:hidden;
-  padding:24px 24px;text-align:center;
+  overflow-y:auto;padding:24px 20px;
   background:var(--bg);
-  background-image:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(0,229,160,.09),transparent);
 }
-#page-onboard.active{display:flex}
-.ob-logo{font-family:'Clash Display',sans-serif;font-size:36px;font-weight:700;letter-spacing:-1px;margin-bottom:4px}
-.ob-logo span{color:var(--accent)}
-.ob-sub{color:var(--muted);font-size:13px;margin-bottom:24px}
-.ob-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:22px 20px;width:100%;max-width:380px}
-.ob-avatar-row{display:flex;justify-content:center;margin-bottom:18px}
-.avatar-ring{width:72px;height:72px;border-radius:50%;border:3px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:30px;cursor:pointer;transition:all .2s;position:relative;overflow:hidden;background:var(--s2)}
+.fs-screen.active{display:flex}
+
+/* ── SPLASH / AUTH ── */
+#screen-splash{background:radial-gradient(ellipse 90% 60% at 50% 0%,rgba(0,229,160,.1),transparent)}
+.splash-logo{font-family:'Clash Display',sans-serif;font-size:42px;font-weight:700;letter-spacing:-2px;margin-bottom:6px;text-align:center}
+.splash-logo span{color:var(--accent)}
+.splash-tagline{color:var(--muted);font-size:13px;margin-bottom:10px;text-align:center}
+.splash-version{display:inline-flex;align-items:center;gap:5px;background:rgba(0,229,160,.08);color:var(--accent);padding:3px 12px;border-radius:50px;font-size:11px;font-weight:700;border:1px solid rgba(0,229,160,.15);margin-bottom:32px}
+
+/* ── AUTH CARD ── */
+.auth-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:24px 20px;width:100%;max-width:380px}
+.auth-tabs{display:flex;background:var(--s2);border-radius:var(--r2);padding:3px;margin-bottom:22px;gap:2px}
+.auth-tab{flex:1;padding:9px;text-align:center;font-size:13px;font-weight:700;border-radius:9px;cursor:pointer;color:var(--muted);transition:all .2s;font-family:'Clash Display',sans-serif}
+.auth-tab.active{background:var(--accent);color:#07080d}
+.auth-divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--muted);font-size:12px}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.auth-footer{text-align:center;margin-top:14px;font-size:12px;color:var(--muted)}
+.auth-footer a{color:var(--accent);cursor:pointer;font-weight:600;text-decoration:none}
+.auth-error{background:rgba(255,95,126,.08);border:1px solid rgba(255,95,126,.22);border-radius:var(--r3);padding:10px 13px;font-size:12px;color:#ff9fb0;margin-bottom:12px;display:none}
+.auth-error.show{display:block}
+
+/* ── SETUP SCREEN (one-time profile) ── */
+#screen-setup{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(0,229,160,.07),transparent)}
+.setup-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:24px 20px;width:100%;max-width:380px}
+.setup-title{font-family:'Clash Display',sans-serif;font-size:22px;font-weight:700;margin-bottom:4px;text-align:center}
+.setup-sub{font-size:12px;color:var(--muted);margin-bottom:20px;text-align:center}
+.avatar-wrap{display:flex;justify-content:center;margin-bottom:18px}
+.avatar-ring{width:72px;height:72px;border-radius:50%;border:3px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:30px;cursor:pointer;transition:border .2s;position:relative;overflow:hidden;background:var(--s2)}
 .avatar-ring:hover{border-color:var(--accent)}
-.avatar-ring img{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
-#avatarInput{display:none}
+.avatar-ring img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 
-/* INPUTS */
-.field{margin-bottom:14px}
-.field label{display:block;font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.field input,.field select,.field textarea{width:100%;background:var(--s2);border:1px solid var(--border);color:var(--text);padding:12px 15px;border-radius:var(--r2);font-family:'Plus Jakarta Sans',sans-serif;font-size:15px;outline:none;transition:border .2s,box-shadow .2s}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,.08)}
-.field textarea{resize:none;height:76px;line-height:1.5}
+/* ── INPUTS ── */
+.field{margin-bottom:13px}
+.field label{display:block;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.field input,.field select,.field textarea{
+  width:100%;background:var(--s2);border:1px solid var(--border);color:var(--text);
+  padding:12px 14px;border-radius:var(--r2);font-family:'Plus Jakarta Sans',sans-serif;
+  font-size:14px;outline:none;transition:border .2s,box-shadow .2s
+}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,229,160,.07)}
+.field textarea{resize:none;height:72px;line-height:1.5}
 .field select option{background:var(--s2)}
-.input-prefix{position:relative}
-.input-prefix span{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--accent);font-weight:700;font-size:15px;pointer-events:none}
-.input-prefix input{padding-left:30px}
+.pfx{position:relative}
+.pfx span{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--accent);font-weight:700;font-size:14px;pointer-events:none}
+.pfx input{padding-left:28px}
+.pw-wrap{position:relative}
+.pw-wrap input{padding-right:42px}
+.pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;color:var(--muted);background:none;border:none;padding:2px}
 
-/* BUTTONS */
-.btn{width:100%;padding:14px;border:none;border-radius:var(--r2);font-family:'Clash Display',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.3px}
+/* ── BUTTONS ── */
+.btn{width:100%;padding:13px;border:none;border-radius:var(--r2);font-family:'Clash Display',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.3px}
 .btn-primary{background:var(--accent);color:#07080d}
-.btn-primary:hover{background:#00ffb3;transform:translateY(-1px);box-shadow:0 8px 28px rgba(0,229,160,.25)}
+.btn-primary:hover{background:#00ffb3;transform:translateY(-1px);box-shadow:0 8px 28px rgba(0,229,160,.22)}
 .btn-primary:active{transform:translateY(0)}
 .btn-primary:disabled{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none}
 .btn-ghost{background:var(--s2);color:var(--text);border:1px solid var(--border)}
 .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
-.btn-danger{background:rgba(255,95,126,.1);color:var(--accent2);border:1px solid rgba(255,95,126,.2)}
-.btn-sm{padding:8px 14px;font-size:12px;width:auto;border-radius:var(--r3)}
-.btn-ai{background:linear-gradient(135deg,rgba(0,229,160,.1),rgba(91,141,238,.1));color:var(--accent);border:1px solid rgba(0,229,160,.2);font-family:'Clash Display',sans-serif;font-size:14px}
-.btn-ai:hover{background:linear-gradient(135deg,rgba(0,229,160,.18),rgba(91,141,238,.18))}
+.btn-danger{background:rgba(255,95,126,.08);color:var(--accent2);border:1px solid rgba(255,95,126,.18)}
+.btn-sm{padding:7px 13px;font-size:12px;width:auto;border-radius:var(--r3)}
+.btn-ai{background:linear-gradient(135deg,rgba(0,229,160,.09),rgba(91,141,238,.09));color:var(--accent);border:1px solid rgba(0,229,160,.18);font-family:'Clash Display',sans-serif;font-size:13px}
+.btn-ai:hover{background:linear-gradient(135deg,rgba(0,229,160,.16),rgba(91,141,238,.16))}
+.btn-loading{opacity:.6;pointer-events:none}
+.spin{display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-/* TOPBAR */
-.topbar{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;background:rgba(7,8,13,.88);backdrop-filter:blur(16px);border-bottom:1px solid rgba(37,45,61,.6)}
-.topbar-left{display:flex;align-items:center;gap:10px}
-.topbar-avatar{width:36px;height:36px;border-radius:50%;background:var(--s2);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:17px;cursor:pointer;flex-shrink:0}
-.topbar-avatar img{width:100%;height:100%;object-fit:cover}
+/* ── MAIN APP ── */
+#screen-main{display:none;min-height:100vh;padding-bottom:90px}
+#screen-main.active{display:block}
+#screen-profile{display:none;min-height:100vh;padding-bottom:90px}
+#screen-profile.active{display:block}
+
+/* ── TOPBAR ── */
+.topbar{padding:13px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;background:rgba(7,8,13,.9);backdrop-filter:blur(16px);border-bottom:1px solid rgba(37,45,61,.5)}
+.topbar-left{display:flex;align-items:center;gap:9px}
+.topbar-av{width:34px;height:34px;border-radius:50%;background:var(--s2);border:2px solid var(--border);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0}
+.topbar-av img{width:100%;height:100%;object-fit:cover}
 .topbar-name{font-family:'Clash Display',sans-serif;font-size:15px;font-weight:600}
 .topbar-name small{display:block;font-family:'Plus Jakarta Sans',sans-serif;font-size:10px;color:var(--muted);font-weight:400}
-.topbar-month{background:var(--s2);border:1px solid var(--border);padding:6px 12px;border-radius:50px;font-size:12px;color:var(--muted);cursor:pointer;transition:all .2s}
+.topbar-month{background:var(--s2);border:1px solid var(--border);padding:5px 11px;border-radius:50px;font-size:11px;color:var(--muted);cursor:pointer;transition:all .2s}
 .topbar-month:hover{border-color:var(--accent);color:var(--accent)}
 
-/* BUDGET HERO */
-.budget-hero{margin:14px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:20px;position:relative;overflow:hidden}
-.budget-hero::after{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(0,229,160,.09),transparent 70%);pointer-events:none}
-.bh-label{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
-.bh-amount{font-family:'Clash Display',sans-serif;font-size:36px;font-weight:700;letter-spacing:-1px;line-height:1}
-.bh-amount em{font-size:17px;color:var(--muted);font-style:normal}
-.bh-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:14px}
-.bh-stat .v{font-family:'Clash Display',sans-serif;font-size:17px;font-weight:600}
+/* ── BUDGET HERO ── */
+.budget-hero{margin:12px 14px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:18px;position:relative;overflow:hidden}
+.budget-hero::after{content:'';position:absolute;top:-60px;right:-60px;width:180px;height:180px;background:radial-gradient(circle,rgba(0,229,160,.09),transparent 70%);pointer-events:none}
+.bh-label{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.bh-amount{font-family:'Clash Display',sans-serif;font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1}
+.bh-amount em{font-size:16px;color:var(--muted);font-style:normal}
+.bh-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px}
+.bh-stat .v{font-family:'Clash Display',sans-serif;font-size:16px;font-weight:600}
 .bh-stat .l{font-size:10px;color:var(--muted);margin-top:1px}
-.v-spent{color:var(--accent2)}
-.v-left{color:var(--accent)}
-.prog-wrap{margin-top:12px}
+.v-spent{color:var(--accent2)}.v-left{color:var(--accent)}
+.prog-wrap{margin-top:11px}
 .prog-track{height:6px;background:var(--s3);border-radius:50px;overflow:hidden}
 .prog-fill{height:100%;border-radius:50px;transition:width .7s cubic-bezier(.4,0,.2,1);background:linear-gradient(90deg,var(--accent),#00c4ff)}
 .prog-fill.warn{background:linear-gradient(90deg,var(--accent3),#ff9f43)}
 .prog-fill.danger{background:linear-gradient(90deg,var(--accent2),#ff9f43)}
 .prog-labels{display:flex;justify-content:space-between;margin-top:5px;font-size:10px;color:var(--muted)}
 
-/* ALERT */
-.alert-bar{margin:0 14px 10px;background:rgba(255,95,126,.07);border:1px solid rgba(255,95,126,.22);border-radius:var(--r2);padding:10px 13px;font-size:12px;color:#ff9fb0;display:flex;align-items:center;gap:7px}
+/* ── ALERT ── */
+.alert-bar{margin:0 14px 10px;background:rgba(255,95,126,.07);border:1px solid rgba(255,95,126,.2);border-radius:var(--r2);padding:9px 13px;font-size:12px;color:#ff9fb0;display:flex;align-items:center;gap:7px}
 .alert-bar.hidden{display:none}
 
-/* TABS */
+/* ── TABS ── */
 .tabs{display:flex;margin:0 14px 12px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:3px;gap:2px}
-.tab{flex:1;padding:9px 4px;text-align:center;font-size:11px;font-weight:600;border-radius:9px;cursor:pointer;color:var(--muted);transition:all .2s;font-family:'Clash Display',sans-serif}
+.tab{flex:1;padding:8px 4px;text-align:center;font-size:11px;font-weight:700;border-radius:9px;cursor:pointer;color:var(--muted);transition:all .2s;font-family:'Clash Display',sans-serif}
 .tab.active{background:var(--accent);color:#07080d}
 
-/* SECTION */
-.sec-title{font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
-.pad{padding:0 14px}
-
-/* CATEGORY GRID */
-.cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px}
-.cat-btn{background:var(--s2);border:2px solid var(--border);border-radius:11px;padding:9px 3px 7px;text-align:center;cursor:pointer;transition:all .2s}
+/* ── CATEGORY GRID ── */
+.cat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:13px}
+.cat-btn{background:var(--s2);border:2px solid var(--border);border-radius:10px;padding:9px 3px 7px;text-align:center;cursor:pointer;transition:all .2s}
 .cat-btn .ci{font-size:20px;display:block;margin-bottom:3px}
 .cat-btn .cl{font-size:9px;color:var(--muted);line-height:1.2;font-weight:500}
 .cat-btn:hover{border-color:var(--accent)}
 .cat-btn.sel{border-color:var(--accent);background:rgba(0,229,160,.07)}
 .cat-btn.sel .cl{color:var(--accent);font-weight:700}
 
-/* FORM */
-.form-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:12px}
-.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* ── FORM ── */
+.form-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.pad{padding:0 14px}
 
-/* EXPENSE LIST */
-.exp-item{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:12px 13px;margin-bottom:8px;display:flex;align-items:center;gap:10px;animation:fadeUp .25s ease}
-.exp-ico{width:42px;height:42px;border-radius:10px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+/* ── EXPENSE ITEMS ── */
+.exp-item{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:11px 13px;margin-bottom:8px;display:flex;align-items:center;gap:10px;animation:fadeUp .25s ease}
+.exp-ico{width:40px;height:40px;border-radius:10px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
 .exp-body{flex:1;min-width:0}
-.exp-cat{font-size:13px;font-weight:600;font-family:'Clash Display',sans-serif;display:flex;align-items:center;gap:6px}
-.exp-note{font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exp-cat{font-size:13px;font-weight:600;font-family:'Clash Display',sans-serif;display:flex;align-items:center;gap:5px}
+.exp-note{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .exp-right{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0}
 .exp-amt{font-family:'Clash Display',sans-serif;font-size:14px;font-weight:700;color:var(--accent2)}
 .del-btn{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:14px;padding:3px;border-radius:5px;transition:color .2s}
@@ -136,134 +176,201 @@ h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
 .dg-head{display:flex;justify-content:space-between;font-size:11px;font-weight:700;color:var(--muted);margin:12px 0 6px;padding-bottom:5px;border-bottom:1px solid var(--border)}
 .dg-total{color:var(--accent3)}
 
-/* ANALYTICS */
+/* ── ANALYTICS ── */
 .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
-.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:14px}
-.stat-card .sv{font-family:'Clash Display',sans-serif;font-size:20px;font-weight:700}
-.stat-card .sl{font-size:10px;color:var(--muted);margin-top:3px}
-.analytics-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:12px}
-.analytics-card h3{font-family:'Clash Display',sans-serif;font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:7px}
-.cb-item{margin-bottom:11px}
+.stat-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r2);padding:13px}
+.stat-card .sv{font-family:'Clash Display',sans-serif;font-size:19px;font-weight:700}
+.stat-card .sl{font-size:10px;color:var(--muted);margin-top:2px}
+.analytics-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.analytics-card h3{font-family:'Clash Display',sans-serif;font-size:14px;font-weight:600;margin-bottom:13px}
+.cb-item{margin-bottom:10px}
 .cb-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px;align-items:center}
 .cb-name{display:flex;align-items:center;gap:6px}
 .cb-pct{color:var(--muted);font-size:10px}
 .cb-track{height:5px;background:var(--s3);border-radius:50px;overflow:hidden}
 .cb-fill{height:100%;border-radius:50px;transition:width .6s ease}
 
-/* PROFILE */
-.profile-hero{margin:14px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:26px 20px;text-align:center;position:relative;overflow:hidden}
-.profile-hero::before{content:'';position:absolute;top:-40px;left:50%;transform:translateX(-50%);width:300px;height:180px;background:radial-gradient(ellipse,rgba(0,229,160,.05),transparent 70%);pointer-events:none}
-.ph-avatar{width:76px;height:76px;border-radius:50%;border:3px solid var(--accent);margin:0 auto 12px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:32px;cursor:pointer;position:relative;background:var(--s2)}
-.ph-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
-.ph-name{font-family:'Clash Display',sans-serif;font-size:22px;font-weight:700}
-.ph-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(0,229,160,.09);color:var(--accent);padding:3px 11px;border-radius:50px;font-size:11px;font-weight:600;margin-top:5px;border:1px solid rgba(0,229,160,.18)}
-.ps-section{margin:0 14px 12px}
-.ps-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:10px}
-.ps-card h3{font-family:'Clash Display',sans-serif;font-size:14px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+/* ── PROFILE PAGE ── */
+.prof-hero{margin:12px 14px;background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:24px 18px;text-align:center;position:relative;overflow:hidden}
+.prof-hero::before{content:'';position:absolute;top:-40px;left:50%;transform:translateX(-50%);width:280px;height:160px;background:radial-gradient(ellipse,rgba(0,229,160,.05),transparent 70%);pointer-events:none}
+.ph-av{width:74px;height:74px;border-radius:50%;border:3px solid var(--accent);margin:0 auto 11px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:30px;cursor:pointer;position:relative;background:var(--s2)}
+.ph-av img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%}
+.ph-name{font-family:'Clash Display',sans-serif;font-size:20px;font-weight:700}
+.ph-email{font-size:11px;color:var(--muted);margin-top:2px}
+.ph-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(0,229,160,.08);color:var(--accent);padding:3px 11px;border-radius:50px;font-size:11px;font-weight:600;margin-top:6px;border:1px solid rgba(0,229,160,.16)}
+.ps-wrap{margin:0 14px 12px}
+.ps-card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:10px}
+.ps-card h3{font-family:'Clash Display',sans-serif;font-size:14px;font-weight:600;margin-bottom:13px;display:flex;align-items:center;gap:7px}
 .all-stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .as-card{background:var(--s2);border:1px solid var(--border);border-radius:var(--r2);padding:12px}
-.as-v{font-family:'Clash Display',sans-serif;font-size:18px;font-weight:700}
+.as-v{font-family:'Clash Display',sans-serif;font-size:17px;font-weight:700}
 .as-l{font-size:10px;color:var(--muted);margin-top:2px}
-.mh-item{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border)}
+.mh-item{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)}
 .mh-item:last-child{border-bottom:none}
 .mh-label{font-size:13px;font-weight:500}
 .mh-amt{font-family:'Clash Display',sans-serif;font-size:13px;font-weight:700}
-.mh-prog{height:3px;background:var(--s3);border-radius:50px;margin-top:4px;overflow:hidden;width:70px}
+.mh-prog{height:3px;background:var(--s3);border-radius:50px;margin-top:3px;overflow:hidden;width:60px}
 .mh-pfill{height:100%;border-radius:50px}
 
-/* CAT MANAGE */
-.cmi{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--border)}
+/* ── CAT MANAGE ── */
+.cmi{display:flex;align-items:center;gap:9px;padding:8px 0;border-bottom:1px solid var(--border)}
 .cmi:last-child{border-bottom:none}
-.cmi-icon{width:34px;height:34px;border-radius:8px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.cmi-ico{width:32px;height:32px;border-radius:8px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
 .cmi-name{flex:1;font-size:13px;font-weight:500}
-.cmi-del{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:16px;padding:4px;border-radius:5px;transition:color .2s}
+.cmi-del{background:none;border:none;color:var(--muted2);cursor:pointer;font-size:15px;padding:3px;border-radius:5px;transition:color .2s}
 .cmi-del:hover{color:var(--accent2)}
-.cmi-del.locked{cursor:not-allowed;opacity:.25}
+.cmi-del.locked{cursor:not-allowed;opacity:.2}
 .add-cat-row{display:flex;gap:7px;margin-top:10px;align-items:center}
-.emoji-inp{width:50px;text-align:center;font-size:17px;padding:11px 8px !important}
+.emoji-inp{width:48px;text-align:center;font-size:16px;padding:11px 6px !important}
 
-/* AI */
-.ai-card{background:linear-gradient(135deg,#0c1420,#0a1810);border:1px solid rgba(0,229,160,.12);border-radius:var(--r);padding:18px;margin-bottom:12px;position:relative;overflow:hidden}
-.ai-card::before{content:'';position:absolute;top:-50px;right:-50px;width:160px;height:160px;background:radial-gradient(circle,rgba(0,229,160,.05),transparent 70%);pointer-events:none}
-.ai-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(0,229,160,.1);color:var(--accent);padding:3px 11px;border-radius:50px;font-size:10px;font-weight:700;margin-bottom:10px;border:1px solid rgba(0,229,160,.18);letter-spacing:.5px}
-.ai-tips-list{list-style:none;margin-top:6px}
-.ai-tips-list li{padding:8px 11px;background:rgba(255,255,255,.025);border-radius:8px;margin-bottom:6px;font-size:12px;line-height:1.6;color:#bfc8da;border-left:3px solid var(--accent)}
+/* ── AI ── */
+.ai-card{background:linear-gradient(135deg,#0c1420,#0a1810);border:1px solid rgba(0,229,160,.12);border-radius:var(--r);padding:16px;margin-bottom:12px}
+.ai-badge{display:inline-flex;align-items:center;gap:5px;background:rgba(0,229,160,.09);color:var(--accent);padding:3px 10px;border-radius:50px;font-size:10px;font-weight:700;margin-bottom:10px;border:1px solid rgba(0,229,160,.16);letter-spacing:.5px}
+.ai-tips-list{list-style:none}
+.ai-tips-list li{padding:7px 10px;background:rgba(255,255,255,.025);border-radius:8px;margin-bottom:5px;font-size:12px;line-height:1.6;color:#bfc8da;border-left:3px solid var(--accent)}
 .ai-tips-list li.danger{border-left-color:var(--accent2)}
 .ai-tips-list li.warn{border-left-color:var(--accent3)}
-.ai-sec{font-family:'Clash Display',sans-serif;font-size:13px;font-weight:600;color:var(--text);margin:12px 0 5px}
-.loading-dots{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;padding:8px 0}
-.dots{display:flex;gap:4px}
+.ai-sec-title{font-family:'Clash Display',sans-serif;font-size:13px;font-weight:600;color:var(--text);margin:10px 0 4px}
+.loading-dots{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;padding:6px 0}
+.dots{display:flex;gap:3px}
 .dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:pulse 1.2s infinite}
-.dot:nth-child(2){animation-delay:.2s}
-.dot:nth-child(3){animation-delay:.4s}
+.dot:nth-child(2){animation-delay:.2s}.dot:nth-child(3){animation-delay:.4s}
 @keyframes pulse{0%,80%,100%{transform:scale(.8);opacity:.5}40%{transform:scale(1.1);opacity:1}}
 
-/* MODAL */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:200;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px)}
+/* ── MODAL ── */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:800;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(6px)}
 .overlay.hidden{display:none}
-.modal{background:var(--s1);border:1px solid var(--border);border-radius:var(--r) var(--r) 0 0;padding:26px 22px 34px;width:100%;max-width:480px;animation:slideUp .28s ease}
+.modal{background:var(--s1);border:1px solid var(--border);border-radius:var(--r) var(--r) 0 0;padding:24px 20px 32px;width:100%;max-width:480px;animation:slideUp .28s ease}
 @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
-.modal-handle{width:34px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px}
-.modal h2{font-family:'Clash Display',sans-serif;font-size:19px;font-weight:700;margin-bottom:3px}
-.modal-sub{font-size:12px;color:var(--muted);margin-bottom:18px}
-.modal-actions{display:flex;gap:9px;margin-top:16px}
+.modal-handle{width:32px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 16px}
+.modal h2{font-family:'Clash Display',sans-serif;font-size:18px;font-weight:700;margin-bottom:3px}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:16px}
+.modal-actions{display:flex;gap:8px;margin-top:14px}
 .modal-actions .btn{flex:1}
 
-/* BOTTOM NAV */
-.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(12,14,20,.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:6px 8px 16px;z-index:100;gap:4px}
+/* ── BOTTOM NAV ── */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(10,12,18,.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);display:flex;padding:6px 8px 14px;z-index:100}
 .nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:7px 4px;cursor:pointer;color:var(--muted);font-size:10px;font-weight:600;transition:all .2s;border:none;background:none;border-radius:10px;font-family:'Plus Jakarta Sans',sans-serif}
 .nav-btn .ni{font-size:20px;line-height:1}
 .nav-btn.active{color:var(--accent);background:rgba(0,229,160,.06)}
 
-/* TOAST */
-.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--s2);border:1px solid var(--border);color:var(--text);padding:10px 18px;border-radius:50px;font-size:12px;font-weight:600;z-index:400;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;box-shadow:0 6px 28px rgba(0,0,0,.4)}
+/* ── MISC ── */
+.chips{display:flex;gap:7px;overflow-x:auto;padding:0 14px 10px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;background:var(--s1);border:1px solid var(--border);border-radius:50px;padding:6px 11px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px}
+.empty{text-align:center;padding:32px 18px;color:var(--muted)}
+.empty .em{font-size:42px;margin-bottom:9px}
+.empty p{font-size:12px;line-height:1.6}
+.divider{height:1px;background:var(--border);margin:13px 0}
+.tag{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:50px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.tag-loan{background:rgba(255,181,71,.1);color:var(--accent3);border:1px solid rgba(255,181,71,.18)}
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--s2);border:1px solid var(--border);color:var(--text);padding:9px 17px;border-radius:50px;font-size:12px;font-weight:600;z-index:999;opacity:0;transition:all .3s;pointer-events:none;white-space:nowrap;box-shadow:0 6px 24px rgba(0,0,0,.4)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.ok{border-color:var(--accent);color:var(--accent)}
 .toast.err{border-color:var(--accent2);color:var(--accent2)}
 
-/* CHIPS */
-.chips{display:flex;gap:7px;overflow-x:auto;padding:0 14px 12px;scrollbar-width:none}
-.chips::-webkit-scrollbar{display:none}
-.chip{flex-shrink:0;background:var(--s1);border:1px solid var(--border);border-radius:50px;padding:6px 12px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:5px}
-
-.empty{text-align:center;padding:36px 20px;color:var(--muted)}
-.empty .em{font-size:44px;margin-bottom:10px}
-.empty p{font-size:12px;line-height:1.6}
-.divider{height:1px;background:var(--border);margin:14px 0}
-.tag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:50px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
-.tag-loan{background:rgba(255,181,71,.1);color:var(--accent3);border:1px solid rgba(255,181,71,.2)}
+/* ── SETUP SCREEN ── */
+#screen-setup{background:radial-gradient(ellipse 80% 50% at 50% 0%,rgba(0,229,160,.07),transparent)}
 </style>
 </head>
 <body>
 <div id="app">
 
-<!-- ONBOARDING -->
-<div id="page-onboard" class="page active">
-  <div class="ob-logo">taka<span>track</span></div>
-  <div class="ob-sub">Your personal BDT expense manager</div>
-  <div class="ob-card">
-    <div class="ob-avatar-row">
-      <div class="avatar-ring" onclick="document.getElementById('avatarInput').click()">
-        <span id="obEmoji">👤</span>
-        <img id="obImg" src="" style="display:none"/>
+<!-- ══════════════ SPLASH / AUTH SCREEN ══════════════ -->
+<div id="screen-splash" class="fs-screen active">
+  <div class="splash-logo">taka<span>track</span></div>
+  <div class="splash-tagline">Your personal BDT expense manager</div>
+  <div class="splash-version">✦ Smart · Secure · Personal</div>
+
+  <div class="auth-card" style="max-width:380px;width:100%">
+    <div class="auth-tabs">
+      <div class="auth-tab active" id="authTab-signin" onclick="switchAuthTab('signin')">Sign In</div>
+      <div class="auth-tab" id="authTab-signup" onclick="switchAuthTab('signup')">Sign Up</div>
+    </div>
+
+    <div id="authErr" class="auth-error"></div>
+
+    <!-- SIGN IN -->
+    <div id="authPanel-signin">
+      <div class="field"><label>Email</label><input type="email" id="siEmail" placeholder="you@email.com" autocomplete="email"/></div>
+      <div class="field"><label>Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="siPass" placeholder="••••••••" autocomplete="current-password"/>
+          <button class="pw-toggle" onclick="togglePw('siPass',this)">👁</button>
+        </div>
       </div>
-      <input type="file" id="avatarInput" accept="image/*" onchange="handleAvatar(event,'ob')"/>
+      <button class="btn btn-primary" id="siBtn" onclick="signIn()">Sign In →</button>
+      <div class="auth-divider">or</div>
+      <button class="btn btn-ghost" onclick="signInGoogle()" style="display:flex;align-items:center;justify-content:center;gap:8px">
+        <span>🌐</span> Continue with Google
+      </button>
+      <div class="auth-footer"><a onclick="showForgot()">Forgot password?</a></div>
     </div>
-    <div class="field"><label>Your Name</label><input type="text" id="obName" placeholder="e.g. Rahim Uddin" maxlength="30"/></div>
-    <div class="field"><label>Monthly Budget (BDT)</label>
-      <div class="input-prefix"><span>৳</span><input type="number" id="obBudget" placeholder="30000" min="1"/></div>
+
+    <!-- SIGN UP -->
+    <div id="authPanel-signup" style="display:none">
+      <div class="field"><label>Full Name</label><input type="text" id="suName" placeholder="Rahim Uddin" maxlength="30"/></div>
+      <div class="field"><label>Email</label><input type="email" id="suEmail" placeholder="you@email.com" autocomplete="email"/></div>
+      <div class="field"><label>Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="suPass" placeholder="Min 6 characters" autocomplete="new-password"/>
+          <button class="pw-toggle" onclick="togglePw('suPass',this)">👁</button>
+        </div>
+      </div>
+      <div class="field"><label>Confirm Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="suPass2" placeholder="Repeat password" autocomplete="new-password"/>
+          <button class="pw-toggle" onclick="togglePw('suPass2',this)">👁</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="suBtn" onclick="signUp()">Create Account →</button>
+      <div class="auth-divider">or</div>
+      <button class="btn btn-ghost" onclick="signInGoogle()" style="display:flex;align-items:center;justify-content:center;gap:8px">
+        <span>🌐</span> Continue with Google
+      </button>
     </div>
-    <div class="field"><label>Start Month</label><input type="month" id="obMonth"/></div>
-    <button class="btn btn-primary" id="obSubmitBtn" onclick="setupProfile()" style="margin-top:8px">Get Started →</button>
-    <button class="btn btn-ghost" id="obCancelBtn" onclick="goTo('profile')" style="margin-top:8px;display:none">Cancel</button>
+  </div>
+
+  <!-- FORGOT PASSWORD (hidden) -->
+  <div id="forgotPanel" style="display:none;max-width:380px;width:100%;margin-top:12px">
+    <div class="auth-card">
+      <div style="font-family:'Clash Display',sans-serif;font-size:16px;font-weight:700;margin-bottom:4px">Reset Password</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:14px">We'll send a reset link to your email</div>
+      <div class="field"><label>Email</label><input type="email" id="fgEmail" placeholder="you@email.com"/></div>
+      <button class="btn btn-primary" onclick="sendReset()">Send Reset Link</button>
+      <button class="btn btn-ghost" onclick="hideForgot()" style="margin-top:8px">← Back to Sign In</button>
+    </div>
   </div>
 </div>
 
-<!-- MAIN APP -->
-<div id="page-main" class="page">
+<!-- ══════════════ PROFILE SETUP SCREEN (one-time) ══════════════ -->
+<div id="screen-setup" class="fs-screen">
+  <div class="splash-logo" style="font-size:28px;margin-bottom:3px">taka<span style="color:var(--accent)">track</span></div>
+  <div style="color:var(--muted);font-size:12px;margin-bottom:20px">Let's set up your profile</div>
+  <div class="setup-card">
+    <div class="avatar-wrap">
+      <div class="avatar-ring" onclick="document.getElementById('avatarFile').click()">
+        <span id="setupEmoji">👤</span>
+        <img id="setupImg" src="" style="display:none"/>
+      </div>
+      <input type="file" id="avatarFile" accept="image/*" style="display:none" onchange="handleAvatarUpload(event)"/>
+    </div>
+    <div class="setup-title">Welcome! 👋</div>
+    <div class="setup-sub">Your account is ready. Set up your expense profile.</div>
+    <div class="field"><label>Display Name</label><input type="text" id="setupName" placeholder="e.g. Rahim Uddin" maxlength="30"/></div>
+    <div class="field"><label>Monthly Budget ৳</label>
+      <div class="pfx"><span>৳</span><input type="number" id="setupBudget" placeholder="30000" min="1"/></div>
+    </div>
+    <div class="field"><label>Start Month</label><input type="month" id="setupMonth"/></div>
+    <button class="btn btn-primary" onclick="saveSetup()">Start Tracking →</button>
+  </div>
+</div>
+
+<!-- ══════════════ MAIN APP SCREEN ══════════════ -->
+<div id="screen-main" class="screen">
   <div class="topbar">
     <div class="topbar-left">
-      <div class="topbar-avatar" onclick="goTo('profile')" id="topbarAv">👤</div>
+      <div class="topbar-av" onclick="goTo('profile')" id="topbarAv">👤</div>
       <div class="topbar-name" id="topbarName">— <small id="topbarDate"></small></div>
     </div>
     <div class="topbar-month" onclick="openBudgetModal()" id="topbarMonth">Month</div>
@@ -271,10 +378,10 @@ h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
 
   <div class="budget-hero">
     <div class="bh-label">Monthly Budget</div>
-    <div class="bh-amount"><em>৳</em> <span id="heroAmt">0</span></div>
+    <div class="bh-amount"><em>৳</em><span id="heroAmt">0</span></div>
     <div class="bh-row">
       <div class="bh-stat"><div class="v v-spent" id="heroSpent">৳0</div><div class="l">Spent</div></div>
-      <div class="bh-stat"><div class="v v-left" id="heroLeft">৳0</div><div class="l">Remaining</div></div>
+      <div class="bh-stat"><div class="v v-left"  id="heroLeft">৳0</div><div class="l">Remaining</div></div>
       <div class="bh-stat"><div class="v" id="heroDays" style="color:var(--text)">0</div><div class="l">Days Left</div></div>
     </div>
     <div class="prog-wrap">
@@ -283,7 +390,7 @@ h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
     </div>
   </div>
 
-  <div class="alert-bar hidden" id="alertBar">⚠️ Budget exceeded! See Insights for AI saving tips.</div>
+  <div class="alert-bar hidden" id="alertBar">⚠️ Budget exceeded! Check Insights for AI tips.</div>
   <div class="chips" id="mainChips"></div>
 
   <div class="tabs">
@@ -292,6 +399,7 @@ h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
     <div class="tab" onclick="switchTab('insights')">💡 Insights</div>
   </div>
 
+  <!-- ADD TAB -->
   <div id="tab-add" class="pad">
     <div class="form-card">
       <div class="field"><label>Category</label>
@@ -308,17 +416,20 @@ h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
           <option value="taken">📥 Money Taken (Borrowed)</option>
         </select>
       </div>
-      <div class="field"><label>Comment <span style="font-size:10px;color:var(--muted)">(optional)</span></label>
+      <div class="field">
+        <label>Comment <span style="font-size:10px;color:var(--muted)">(optional)</span></label>
         <textarea id="fComment" placeholder="e.g. Lunch at Dhanmondi, electricity bill..."></textarea>
       </div>
-      <button class="btn btn-primary" onclick="addExpense()">+ Add Expense</button>
+      <button class="btn btn-primary" id="addBtn" onclick="addExpense()">+ Add Expense</button>
     </div>
   </div>
 
+  <!-- HISTORY TAB -->
   <div id="tab-history" class="pad" style="display:none">
     <div id="histList"></div>
   </div>
 
+  <!-- INSIGHTS TAB -->
   <div id="tab-insights" class="pad" style="display:none">
     <div class="stat-grid" id="insStats"></div>
     <div class="analytics-card">
@@ -332,25 +443,26 @@ h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
   </div>
 </div>
 
-<!-- PROFILE -->
-<div id="page-profile" class="page">
+<!-- ══════════════ PROFILE SCREEN ══════════════ -->
+<div id="screen-profile" class="screen">
   <div class="topbar">
     <button class="btn btn-ghost btn-sm" onclick="goTo('main')" style="width:auto">← Back</button>
     <div style="font-family:'Clash Display',sans-serif;font-size:15px;font-weight:600">My Profile</div>
-    <button class="btn btn-ghost btn-sm" onclick="openOnboarding()" style="width:auto">✏️ Edit Profile</button>
+    <button class="btn btn-ghost btn-sm" onclick="openEditProfile()" style="width:auto">✏️ Edit</button>
   </div>
 
-  <div class="profile-hero">
-    <div class="ph-avatar" onclick="document.getElementById('profAvatarInput').click()" id="phAv">
+  <div class="prof-hero">
+    <div class="ph-av" onclick="document.getElementById('profAvatarFile').click()" id="phAv">
       <span id="phEmoji">👤</span>
       <img id="phImg" src="" style="display:none"/>
     </div>
-    <input type="file" id="profAvatarInput" accept="image/*" style="display:none" onchange="handleAvatar(event,'prof')"/>
+    <input type="file" id="profAvatarFile" accept="image/*" style="display:none" onchange="handleAvatarUpload(event,'prof')"/>
     <div class="ph-name" id="phName">—</div>
+    <div class="ph-email" id="phEmail">—</div>
     <div class="ph-badge" id="phBadge">🌱 Getting Started</div>
   </div>
 
-  <div class="ps-section">
+  <div class="ps-wrap">
     <div class="ps-card">
       <h3>📈 All-Time Statistics</h3>
       <div class="all-stats-grid" id="allStats"></div>
@@ -359,7 +471,7 @@ h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
     <div class="ps-card">
       <h3>⚙️ Budget Settings</h3>
       <div class="field"><label>Monthly Budget ৳</label>
-        <div class="input-prefix"><span>৳</span><input type="number" id="profBudget" placeholder="30000"/></div>
+        <div class="pfx"><span>৳</span><input type="number" id="profBudget" placeholder="30000"/></div>
       </div>
       <button class="btn btn-primary" onclick="saveProfBudget()">Update Budget</button>
     </div>
@@ -368,7 +480,7 @@ h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
       <h3>🗂 Manage Categories</h3>
       <div id="catManage"></div>
       <div class="divider"></div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:9px;font-weight:700">ADD CUSTOM CATEGORY</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px;font-weight:700">ADD CUSTOM CATEGORY</div>
       <div class="add-cat-row">
         <input type="text" class="emoji-inp" id="newEmoji" placeholder="😀" maxlength="2"/>
         <input type="text" id="newCatName" placeholder="Category name" maxlength="20" style="flex:1"/>
@@ -382,21 +494,22 @@ h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
     </div>
 
     <div class="ps-card">
-      <h3 style="color:var(--accent2)">⚠️ Data Management</h3>
+      <h3 style="color:var(--accent2)">⚠️ Account</h3>
       <button class="btn btn-danger" onclick="exportData()" style="margin-bottom:8px">📤 Export JSON Backup</button>
-      <button class="btn btn-danger" onclick="confirmReset()">🗑 Reset All Data</button>
+      <button class="btn btn-danger" onclick="doSignOut()">🚪 Sign Out</button>
     </div>
   </div>
 </div>
 
-<!-- BUDGET MODAL -->
+<!-- ══════════════ MODALS ══════════════ -->
+<!-- Budget Modal -->
 <div class="overlay hidden" id="budgetModal">
   <div class="modal">
     <div class="modal-handle"></div>
     <h2>Month & Budget</h2>
     <div class="modal-sub">Switch month or update your budget</div>
     <div class="field"><label>Month</label><input type="month" id="mMonth"/></div>
-    <div class="field"><label>Budget ৳</label><div class="input-prefix"><span>৳</span><input type="number" id="mBudget"/></div></div>
+    <div class="field"><label>Budget ৳</label><div class="pfx"><span>৳</span><input type="number" id="mBudget"/></div></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('budgetModal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveBudgetModal()">Save</button>
@@ -404,250 +517,447 @@ h1,h2,h3,.display{font-family:'Clash Display',sans-serif}
   </div>
 </div>
 
+<!-- Edit Profile Modal -->
+<div class="overlay hidden" id="editModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h2>Edit Profile</h2>
+    <div class="modal-sub">Update your display name and month</div>
+    <div class="field"><label>Display Name</label><input type="text" id="editName" maxlength="30"/></div>
+    <div class="field"><label>Active Month</label><input type="month" id="editMonth"/></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('editModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEditProfile()">Save</button>
+    </div>
+  </div>
+</div>
 
+<!-- Bottom Nav -->
 <nav class="bottom-nav" id="bottomNav" style="display:none">
   <button class="nav-btn active" onclick="goTo('main')" id="nav-main"><span class="ni">🏠</span>Home</button>
   <button class="nav-btn" onclick="goTo('profile')" id="nav-profile"><span class="ni">👤</span>Profile</button>
 </nav>
 
 <div class="toast" id="toast"></div>
-</div>
+</div><!-- /app -->
 
 <script>
-/* ─── DB ─── */
-const DB_NAME='TakaTrackDB', DB_VER=3;
-let db;
+/* ════════════════════════════════════════════
+   SUPABASE INIT
+════════════════════════════════════════════ */
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-function openDB(){
-  return new Promise((res,rej)=>{
-    const req=indexedDB.open(DB_NAME,DB_VER);
-    req.onupgradeneeded=e=>{
-      const d=e.target.result;
-      if(!d.objectStoreNames.contains('profile')) d.createObjectStore('profile',{keyPath:'id'});
-      if(!d.objectStoreNames.contains('expenses')){
-        const s=d.createObjectStore('expenses',{keyPath:'id',autoIncrement:true});
-        s.createIndex('month','month');
-      }
-      if(!d.objectStoreNames.contains('categories')) d.createObjectStore('categories',{keyPath:'id'});
-    };
-    req.onsuccess=e=>{db=e.target.result;res(db);};
-    req.onerror=()=>rej(req.error);
-  });
-}
-const tx=(store,mode)=>db.transaction(store,mode).objectStore(store);
-const dbGet=(s,k)=>new Promise((r,j)=>{const q=tx(s,'readonly').get(k);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
-const dbPut=(s,v)=>new Promise((r,j)=>{const q=tx(s,'readwrite').put(v);q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
-const dbDel=(s,k)=>new Promise((r,j)=>{const q=tx(s,'readwrite').delete(k);q.onsuccess=()=>r();q.onerror=()=>j(q.error);});
-const dbAll=(s)=>new Promise((r,j)=>{const q=tx(s,'readonly').getAll();q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error);});
+/* ════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════ */
+let currentUser = null;
+let profile = null;
+let categories = [];
+let expenses = [];
+let selectedCat = null;
+let activeTab = 'add';
+let pendingAvatarB64 = null;
 
-/* ─── STATE ─── */
-let profile=null, categories=[], expenses=[], selectedCat=null, activeTab='add';
-
-const DEFAULT_CATS=[
-  {id:'rent',    label:'Room Rent',  icon:'🏠',color:'#4ecdc4',locked:true},
-  {id:'utility', label:'Utility',   icon:'💡',color:'#ffd93d',locked:true},
-  {id:'food',    label:'Food',      icon:'🍚',color:'#f7a072',locked:true},
-  {id:'relative',label:'Relative',  icon:'👨‍👩‍👧',color:'#a8e6cf',locked:true},
-  {id:'medical', label:'Medical',   icon:'💊',color:'#ff6b9d',locked:true},
-  {id:'myself',  label:'Myself',    icon:'🧍',color:'#c3aed6',locked:true},
-  {id:'shopping',label:'Shopping',  icon:'🛍️',color:'#fddb3a',locked:true},
-  {id:'maintenance',label:'Maintain',icon:'🔧',color:'#6bcb77',locked:true},
-  {id:'loan',    label:'Loan',      icon:'💰',color:'#ffb547',locked:true},
-  {id:'other',   label:'Other',     icon:'📦',color:'#adb5bd',locked:true},
+const DEFAULT_CATS = [
+  {id:'rent',    label:'Room Rent',  icon:'🏠', color:'#4ecdc4', locked:true},
+  {id:'utility', label:'Utility',   icon:'💡', color:'#ffd93d', locked:true},
+  {id:'food',    label:'Food',      icon:'🍚', color:'#f7a072', locked:true},
+  {id:'relative',label:'Relative',  icon:'👨‍👩‍👧', color:'#a8e6cf', locked:true},
+  {id:'medical', label:'Medical',   icon:'💊', color:'#ff6b9d', locked:true},
+  {id:'myself',  label:'Myself',    icon:'🧍', color:'#c3aed6', locked:true},
+  {id:'shopping',label:'Shopping',  icon:'🛍️', color:'#fddb3a', locked:true},
+  {id:'maintenance',label:'Maintain',icon:'🔧', color:'#6bcb77', locked:true},
+  {id:'loan',    label:'Loan',      icon:'💰', color:'#ffb547', locked:true},
+  {id:'other',   label:'Other',     icon:'📦', color:'#adb5bd', locked:true},
 ];
 
-const getCat=id=>categories.find(c=>c.id===id)||{icon:'❓',label:'Unknown',color:'#888'};
-const fmt=n=>'৳'+Number(n||0).toLocaleString('en-IN');
-const mLabel=ym=>{const[y,m]=ym.split('-');return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'short',year:'numeric'});};
-const todayStr=()=>new Date().toISOString().slice(0,10);
-const thisMonth=()=>new Date().toISOString().slice(0,7);
-const monthExp=ym=>expenses.filter(e=>e.month===ym);
-const totSpent=ym=>monthExp(ym).reduce((s,e)=>s+e.amount,0);
-const dLeft=ym=>{
+const getCat = id => categories.find(c=>c.id===id) || {icon:'❓',label:'Unknown',color:'#888'};
+const fmt = n => '৳' + Number(n||0).toLocaleString('en-IN');
+const mLabel = ym => { const[y,m]=ym.split('-'); return new Date(y,m-1,1).toLocaleDateString('en-US',{month:'short',year:'numeric'}); };
+const todayStr = () => new Date().toISOString().slice(0,10);
+const thisMonth = () => new Date().toISOString().slice(0,7);
+const monthExp = ym => expenses.filter(e=>e.month===ym);
+const totSpent = ym => monthExp(ym).reduce((s,e)=>s+e.amount,0);
+const dLeft = ym => {
   const n=new Date(),[y,m]=ym.split('-').map(Number),last=new Date(y,m,0).getDate();
-  return n.getFullYear()===y&&n.getMonth()+1===m?Math.max(0,last-n.getDate()):0;
+  return n.getFullYear()===y&&n.getMonth()+1===m ? Math.max(0,last-n.getDate()) : 0;
 };
 
-/* ─── INIT ─── */
-async function init(){
-  await openDB();
-  profile=await dbGet('profile','main');
-  const catRows=await dbAll('categories');
-  expenses=await dbAll('expenses');
-  if(catRows.length){categories=catRows;}
-  else{categories=DEFAULT_CATS.map(c=>({...c}));for(const c of categories)await dbPut('categories',c);}
-  if(!profile){document.getElementById('obMonth').value=thisMonth();showPage('onboard');}
-  else bootApp();
-}
-
-function bootApp(){
-  document.getElementById('bottomNav').style.display='flex';
-  document.getElementById('fDate').value=todayStr();
-  const td=new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
-  document.getElementById('topbarDate').textContent=td;
-  updateTopbar();renderCatGrid();updateAll();showPage('main');
-}
-
-/* ─── ONBOARDING ─── */
-let pendingAvatar=null;
-
-function handleAvatar(e,ctx){
-  const f=e.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=ev=>{
-    pendingAvatar=ev.target.result;
-    if(ctx==='ob'){
-      document.getElementById('obEmoji').style.display='none';
-      document.getElementById('obImg').src=ev.target.result;
-      document.getElementById('obImg').style.display='block';
-    } else {
-      document.getElementById('phImg').src=ev.target.result;
-      document.getElementById('phImg').style.display='block';
-      document.getElementById('phEmoji').style.display='none';
-      if(profile){profile.avatar=ev.target.result;dbPut('profile',profile);updateTopbar();}
-    }
-  };
-  r.readAsDataURL(f);
-}
-
-async function setupProfile(){
-  const name=document.getElementById('obName').value.trim();
-  const budget=parseFloat(document.getElementById('obBudget').value);
-  const month=document.getElementById('obMonth').value;
-  if(!name){showToast('Enter your name','err');return;}
-  if(!budget||budget<1){showToast('Enter valid budget','err');return;}
-  if(!month){showToast('Select a month','err');return;}
-  const isNew=!profile;
-  if(!profile) profile={id:'main',createdAt:Date.now()};
-  profile.name=name;profile.budget=budget;profile.month=month;
-  if(pendingAvatar) profile.avatar=pendingAvatar;
-  await dbPut('profile',profile);
-  pendingAvatar=null;
-  if(isNew){bootApp();}
-  else{updateTopbar();updateAll();showPage('profile');showToast('Profile updated ✓','ok');}
-}
-
-/* ─── NAVIGATION ─── */
-function showPage(id){
-  // hide onboarding overlay
-  document.getElementById('page-onboard').classList.remove('active');
-  // show correct main page
-  document.querySelectorAll('.page:not(#page-onboard)').forEach(p=>p.classList.remove('active'));
-  if(id==='onboard'){
-    document.getElementById('page-onboard').classList.add('active');
-    document.getElementById('bottomNav').style.display='none';
+/* ════════════════════════════════════════════
+   STARTUP — check session
+════════════════════════════════════════════ */
+async function init() {
+  // Check if Supabase is configured
+  if (SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+    showScreen('splash');
+    showAuthError('⚙️ Please configure your Supabase URL and anon key in the HTML file. See the SUPABASE CONFIG comment at the top.');
     return;
   }
-  document.getElementById('page-'+id).classList.add('active');
-  document.getElementById('bottomNav').style.display='flex';
-  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  const nb=document.getElementById('nav-'+id);if(nb)nb.classList.add('active');
-  if(id==='profile')renderProfile();
-}
-function goTo(id){showPage(id);}
-function openOnboarding(){
-  if(profile){
-    document.getElementById('obName').value=profile.name||'';
-    document.getElementById('obBudget').value=profile.budget||'';
-    document.getElementById('obMonth').value=profile.month||thisMonth();
-    if(profile.avatar){
-      document.getElementById('obEmoji').style.display='none';
-      document.getElementById('obImg').src=profile.avatar;
-      document.getElementById('obImg').style.display='block';
-    }
-    document.getElementById('obSubmitBtn').textContent='Save Changes ✓';
-    document.getElementById('obCancelBtn').style.display='block';
+
+  const { data: { session } } = await sb.auth.getSession();
+  if (session?.user) {
+    currentUser = session.user;
+    await loadUserData();
   } else {
-    document.getElementById('obSubmitBtn').textContent='Get Started →';
-    document.getElementById('obCancelBtn').style.display='none';
+    showScreen('splash');
   }
-  showPage('onboard');
+
+  // Listen for auth changes (e.g. email confirmation)
+  sb.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session?.user) {
+      currentUser = session.user;
+      await loadUserData();
+    } else if (event === 'SIGNED_OUT') {
+      currentUser = null; profile = null; expenses = []; categories = [];
+      showScreen('splash');
+      document.getElementById('bottomNav').style.display = 'none';
+    }
+  });
 }
 
-/* ─── TOPBAR ─── */
-function updateTopbar(){
-  if(!profile)return;
-  const tn=document.getElementById('topbarName');
-  tn.childNodes[0].textContent=profile.name+' ';
-  document.getElementById('topbarMonth').textContent=mLabel(profile.month);
-  const av=document.getElementById('topbarAv');
-  if(profile.avatar)av.innerHTML=`<img src="${profile.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
-  else av.textContent='👤';
+/* ════════════════════════════════════════════
+   AUTH FUNCTIONS
+════════════════════════════════════════════ */
+function switchAuthTab(tab) {
+  document.querySelectorAll('.auth-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('authTab-'+tab).classList.add('active');
+  document.getElementById('authPanel-signin').style.display = tab==='signin'?'block':'none';
+  document.getElementById('authPanel-signup').style.display = tab==='signup'?'block':'none';
+  clearAuthError();
 }
 
-/* ─── HERO ─── */
-function updateHero(){
-  if(!profile)return;
-  const sp=totSpent(profile.month),left=profile.budget-sp;
-  const pct=Math.min((sp/profile.budget)*100,100),dl=dLeft(profile.month);
-  document.getElementById('heroAmt').textContent=profile.budget.toLocaleString('en-IN');
-  document.getElementById('heroSpent').textContent=fmt(sp);
-  document.getElementById('heroLeft').textContent=left>=0?fmt(left):'-'+fmt(Math.abs(left));
-  document.getElementById('heroDays').textContent=dl;
-  document.getElementById('progPct').textContent=Math.round(pct)+'% spent';
-  document.getElementById('dailyLeft').textContent=dl>0&&left>0?fmt(Math.round(left/dl))+'/day left':left<=0?'Over budget':'—';
-  const f=document.getElementById('progFill');
-  f.style.width=pct+'%';f.className='prog-fill'+(pct>=100?' danger':pct>=70?' warn':'');
-  document.getElementById('alertBar').className='alert-bar'+(sp>profile.budget?'':' hidden');
+function showAuthError(msg) {
+  const el = document.getElementById('authErr');
+  el.textContent = msg; el.classList.add('show');
+}
+function clearAuthError() { document.getElementById('authErr').classList.remove('show'); }
+
+function togglePw(id, btn) {
+  const inp = document.getElementById(id);
+  inp.type = inp.type==='password' ? 'text' : 'password';
+  btn.textContent = inp.type==='password' ? '👁' : '🙈';
 }
 
-function updateChips(){
-  const me=monthExp(profile.month),bc={};
-  me.forEach(e=>{bc[e.category]=(bc[e.category]||0)+e.amount;});
-  const top=Object.entries(bc).sort((a,b)=>b[1]-a[1]).slice(0,4);
-  document.getElementById('mainChips').innerHTML=top.map(([id,amt])=>{
-    const c=getCat(id);return`<div class="chip">${c.icon}<span style="color:${c.color}">${c.label}</span><strong>${fmt(amt)}</strong></div>`;
+async function signIn() {
+  const email = document.getElementById('siEmail').value.trim();
+  const pass  = document.getElementById('siPass').value;
+  if (!email||!pass) { showAuthError('Please fill in all fields'); return; }
+  clearAuthError();
+  setLoading('siBtn', true);
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  setLoading('siBtn', false);
+  if (error) { showAuthError('❌ ' + error.message); return; }
+}
+
+async function signUp() {
+  const name  = document.getElementById('suName').value.trim();
+  const email = document.getElementById('suEmail').value.trim();
+  const pass  = document.getElementById('suPass').value;
+  const pass2 = document.getElementById('suPass2').value;
+  if (!name||!email||!pass) { showAuthError('Please fill in all fields'); return; }
+  if (pass !== pass2) { showAuthError('Passwords do not match'); return; }
+  if (pass.length < 6) { showAuthError('Password must be at least 6 characters'); return; }
+  clearAuthError();
+  setLoading('suBtn', true);
+  const { error } = await sb.auth.signUp({
+    email, password: pass,
+    options: { data: { display_name: name } }
+  });
+  setLoading('suBtn', false);
+  if (error) { showAuthError('❌ ' + error.message); return; }
+  showAuthError('✅ Check your email to confirm your account, then sign in!');
+  document.getElementById('authErr').style.background = 'rgba(0,229,160,.08)';
+  document.getElementById('authErr').style.borderColor = 'rgba(0,229,160,.3)';
+  document.getElementById('authErr').style.color = 'var(--accent)';
+  switchAuthTab('signin');
+}
+
+async function signInGoogle() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href }
+  });
+  if (error) showAuthError('❌ ' + error.message);
+}
+
+function showForgot() {
+  document.getElementById('forgotPanel').style.display = 'block';
+  document.querySelector('.auth-card').style.display = 'none';
+}
+function hideForgot() {
+  document.getElementById('forgotPanel').style.display = 'none';
+  document.querySelector('.auth-card').style.display = 'block';
+}
+async function sendReset() {
+  const email = document.getElementById('fgEmail').value.trim();
+  if (!email) { showAuthError('Enter your email'); return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+  if (error) { showAuthError('❌ '+error.message); return; }
+  showToast('Reset link sent! Check email ✓','ok');
+  hideForgot();
+}
+
+async function doSignOut() {
+  await sb.auth.signOut();
+  showToast('Signed out','');
+}
+
+function setLoading(btnId, on) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = on;
+  btn.textContent = on ? '⏳ Please wait...' : (btnId==='siBtn' ? 'Sign In →' : 'Create Account →');
+}
+
+/* ════════════════════════════════════════════
+   LOAD USER DATA FROM SUPABASE
+════════════════════════════════════════════ */
+async function loadUserData() {
+  // Load profile
+  const { data: prof } = await sb.from('profiles').select('*').eq('user_id', currentUser.id).single();
+  if (!prof) {
+    // First time: show setup
+    document.getElementById('setupMonth').value = thisMonth();
+    const metaName = currentUser.user_metadata?.display_name || currentUser.user_metadata?.full_name || '';
+    if (metaName) document.getElementById('setupName').value = metaName;
+    showScreen('setup');
+    return;
+  }
+  profile = prof;
+
+  // Load categories
+  const { data: cats } = await sb.from('categories').select('*').eq('user_id', currentUser.id).order('created_at');
+  if (cats && cats.length) {
+    categories = cats;
+  } else {
+    // Insert defaults
+    const toInsert = DEFAULT_CATS.map(c=>({...c, user_id: currentUser.id}));
+    const { data: inserted } = await sb.from('categories').insert(toInsert).select();
+    categories = inserted || DEFAULT_CATS.map(c=>({...c}));
+  }
+
+  // Load expenses
+  const { data: exps } = await sb.from('expenses').select('*').eq('user_id', currentUser.id).order('date', {ascending:false});
+  expenses = exps || [];
+
+  bootApp();
+}
+
+/* ════════════════════════════════════════════
+   PROFILE SETUP (first-time)
+════════════════════════════════════════════ */
+let pendingSetupAvatar = null;
+
+function handleAvatarUpload(e, ctx) {
+  const file = e.target.files[0]; if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const data = ev.target.result;
+    if (ctx === 'prof') {
+      // save directly to profile
+      profile.avatar = data;
+      sb.from('profiles').update({avatar: data}).eq('user_id', currentUser.id);
+      updateTopbar(); renderProfilePage();
+      showToast('Photo updated ✓','ok');
+    } else {
+      pendingSetupAvatar = data;
+      document.getElementById('setupEmoji').style.display = 'none';
+      document.getElementById('setupImg').src = data;
+      document.getElementById('setupImg').style.display = 'block';
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+async function saveSetup() {
+  const name   = document.getElementById('setupName').value.trim();
+  const budget = parseFloat(document.getElementById('setupBudget').value);
+  const month  = document.getElementById('setupMonth').value;
+  if (!name)        { showToast('Enter your name','err'); return; }
+  if (!budget||budget<1) { showToast('Enter valid budget','err'); return; }
+  if (!month)       { showToast('Select a month','err'); return; }
+
+  const profData = {
+    user_id: currentUser.id,
+    name, budget, month,
+    avatar: pendingSetupAvatar || null,
+    created_at: new Date().toISOString()
+  };
+  const { data, error } = await sb.from('profiles').insert(profData).select().single();
+  if (error) { showToast('Error saving profile: '+error.message,'err'); return; }
+  profile = data;
+
+  // Insert default categories
+  const toInsert = DEFAULT_CATS.map(c=>({...c, user_id: currentUser.id}));
+  const { data: inserted } = await sb.from('categories').insert(toInsert).select();
+  categories = inserted || DEFAULT_CATS.map(c=>({...c}));
+  expenses = [];
+
+  bootApp();
+}
+
+/* ════════════════════════════════════════════
+   BOOT
+════════════════════════════════════════════ */
+function bootApp() {
+  document.getElementById('bottomNav').style.display = 'flex';
+  document.getElementById('fDate').value = todayStr();
+  document.getElementById('topbarDate').textContent = new Date().toLocaleDateString('en-US',{weekday:'long',month:'short',day:'numeric'});
+  updateTopbar();
+  renderCatGrid();
+  updateAll();
+  showScreen('main');
+}
+
+/* ════════════════════════════════════════════
+   SCREEN MANAGEMENT
+════════════════════════════════════════════ */
+function showScreen(id) {
+  // Hide all fs-screens
+  document.querySelectorAll('.fs-screen').forEach(s=>s.classList.remove('active'));
+  // Hide all regular screens
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+
+  const el = document.getElementById('screen-'+id);
+  if (!el) return;
+
+  if (el.classList.contains('fs-screen')) {
+    el.classList.add('active');
+    document.getElementById('bottomNav').style.display = 'none';
+  } else {
+    el.classList.add('active');
+    if (id !== 'profile') {
+      document.getElementById('bottomNav').style.display = 'flex';
+    }
+  }
+
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  const nb = document.getElementById('nav-'+id);
+  if (nb) nb.classList.add('active');
+}
+
+function goTo(id) {
+  showScreen(id);
+  if (id === 'profile') renderProfilePage();
+}
+
+/* ════════════════════════════════════════════
+   TOPBAR
+════════════════════════════════════════════ */
+function updateTopbar() {
+  if (!profile) return;
+  document.getElementById('topbarName').childNodes[0].textContent = profile.name + ' ';
+  document.getElementById('topbarMonth').textContent = mLabel(profile.month);
+  const av = document.getElementById('topbarAv');
+  if (profile.avatar) av.innerHTML = `<img src="${profile.avatar}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`;
+  else av.textContent = '👤';
+}
+
+/* ════════════════════════════════════════════
+   BUDGET HERO
+════════════════════════════════════════════ */
+function updateHero() {
+  if (!profile) return;
+  const sp = totSpent(profile.month), left = profile.budget - sp;
+  const pct = Math.min((sp/profile.budget)*100, 100), dl = dLeft(profile.month);
+  document.getElementById('heroAmt').textContent    = profile.budget.toLocaleString('en-IN');
+  document.getElementById('heroSpent').textContent  = fmt(sp);
+  document.getElementById('heroLeft').textContent   = left>=0 ? fmt(left) : '-'+fmt(Math.abs(left));
+  document.getElementById('heroDays').textContent   = dl;
+  document.getElementById('progPct').textContent    = Math.round(pct)+'% spent';
+  document.getElementById('dailyLeft').textContent  = dl>0&&left>0 ? fmt(Math.round(left/dl))+'/day left' : left<=0?'Over budget':'—';
+  const f = document.getElementById('progFill');
+  f.style.width = pct+'%';
+  f.className = 'prog-fill'+(pct>=100?' danger':pct>=70?' warn':'');
+  document.getElementById('alertBar').className = 'alert-bar'+(sp>profile.budget?'':' hidden');
+}
+
+function updateChips() {
+  const bc = {}; monthExp(profile.month).forEach(e=>{bc[e.category]=(bc[e.category]||0)+e.amount;});
+  const top = Object.entries(bc).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  document.getElementById('mainChips').innerHTML = top.map(([id,amt])=>{
+    const c=getCat(id); return `<div class="chip">${c.icon}<span style="color:${c.color}">${c.label}</span><strong>${fmt(amt)}</strong></div>`;
   }).join('');
 }
 
-/* ─── CAT GRID ─── */
-function renderCatGrid(){
-  document.getElementById('catGrid').innerHTML=categories.map(c=>
+/* ════════════════════════════════════════════
+   CATEGORY GRID
+════════════════════════════════════════════ */
+function renderCatGrid() {
+  document.getElementById('catGrid').innerHTML = categories.map(c=>
     `<div class="cat-btn${selectedCat===c.id?' sel':''}" onclick="selectCat('${c.id}')">
       <span class="ci">${c.icon}</span><span class="cl">${c.label}</span>
     </div>`
   ).join('');
-  document.getElementById('loanRow').style.display=selectedCat==='loan'?'block':'none';
+  document.getElementById('loanRow').style.display = selectedCat==='loan' ? 'block' : 'none';
 }
-function selectCat(id){selectedCat=id;renderCatGrid();}
+function selectCat(id) { selectedCat=id; renderCatGrid(); }
 
-/* ─── ADD EXPENSE ─── */
-async function addExpense(){
-  const amt=parseFloat(document.getElementById('fAmt').value);
-  const date=document.getElementById('fDate').value;
-  const comment=document.getElementById('fComment').value.trim();
-  const loanType=document.getElementById('fLoanType').value;
-  if(!selectedCat){showToast('Pick a category','err');return;}
-  if(!amt||amt<1){showToast('Enter valid amount','err');return;}
-  if(!date){showToast('Select a date','err');return;}
-  const month=date.slice(0,7);
-  const exp={category:selectedCat,amount:amt,date,month,comment,loanType:selectedCat==='loan'?loanType:null,ts:Date.now()};
-  const newId=await dbPut('expenses',exp);
-  exp.id=newId;expenses.push(exp);
-  document.getElementById('fAmt').value='';
-  document.getElementById('fComment').value='';
-  selectedCat=null;renderCatGrid();updateAll();
+/* ════════════════════════════════════════════
+   ADD EXPENSE
+════════════════════════════════════════════ */
+async function addExpense() {
+  const amt     = parseFloat(document.getElementById('fAmt').value);
+  const date    = document.getElementById('fDate').value;
+  const comment = document.getElementById('fComment').value.trim();
+  const loanType = document.getElementById('fLoanType').value;
+
+  if (!selectedCat) { showToast('Pick a category','err'); return; }
+  if (!amt||amt<1)  { showToast('Enter valid amount','err'); return; }
+  if (!date)         { showToast('Select a date','err'); return; }
+
+  const btn = document.getElementById('addBtn');
+  btn.disabled = true; btn.textContent = '⏳ Saving...';
+
+  const rec = {
+    user_id: currentUser.id,
+    category: selectedCat,
+    amount: amt,
+    date,
+    month: date.slice(0,7),
+    comment,
+    loan_type: selectedCat==='loan' ? loanType : null,
+  };
+
+  const { data, error } = await sb.from('expenses').insert(rec).select().single();
+  btn.disabled = false; btn.textContent = '+ Add Expense';
+
+  if (error) { showToast('Error: '+error.message,'err'); return; }
+  expenses.unshift(data);
+  document.getElementById('fAmt').value = '';
+  document.getElementById('fComment').value = '';
+  selectedCat = null;
+  renderCatGrid(); updateAll();
   showToast('Expense saved ✓','ok');
 }
 
-async function deleteExp(id){
-  await dbDel('expenses',id);expenses=expenses.filter(e=>e.id!==id);updateAll();showToast('Deleted','');
+/* ════════════════════════════════════════════
+   DELETE EXPENSE
+════════════════════════════════════════════ */
+async function deleteExp(id) {
+  await sb.from('expenses').delete().eq('id', id);
+  expenses = expenses.filter(e=>e.id!==id);
+  updateAll();
+  showToast('Deleted','');
 }
 
-/* ─── HISTORY ─── */
-function renderHistory(){
-  const me=monthExp(profile.month).slice().sort((a,b)=>b.date.localeCompare(a.date)||b.ts-a.ts);
-  const el=document.getElementById('histList');
-  if(!me.length){el.innerHTML=`<div class="empty"><div class="em">📭</div><p>No expenses this month</p></div>`;return;}
-  const g={};me.forEach(e=>{if(!g[e.date])g[e.date]=[];g[e.date].push(e);});
-  const dates=Object.keys(g).sort((a,b)=>b.localeCompare(a));
-  el.innerHTML=dates.map(d=>{
-    const dtot=g[d].reduce((s,e)=>s+e.amount,0);
-    const dl=new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-    const items=g[d].map(e=>{
-      const cat=getCat(e.category);
-      const lt=e.loanType?`<span class="tag tag-loan">${e.loanType==='given'?'💸 Lent':'📥 Borrowed'}</span>`:'';
-      return`<div class="exp-item">
+/* ════════════════════════════════════════════
+   HISTORY
+════════════════════════════════════════════ */
+function renderHistory() {
+  const me = monthExp(profile.month).slice().sort((a,b)=>b.date.localeCompare(a.date));
+  const el = document.getElementById('histList');
+  if (!me.length) { el.innerHTML=`<div class="empty"><div class="em">📭</div><p>No expenses this month</p></div>`; return; }
+  const g={};
+  me.forEach(e=>{if(!g[e.date])g[e.date]=[];g[e.date].push(e);});
+  const dates = Object.keys(g).sort((a,b)=>b.localeCompare(a));
+  el.innerHTML = dates.map(d=>{
+    const dtot = g[d].reduce((s,e)=>s+e.amount,0);
+    const dlabel = new Date(d+'T00:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    const items = g[d].map(e=>{
+      const cat = getCat(e.category);
+      const lt = e.loan_type ? `<span class="tag tag-loan">${e.loan_type==='given'?'💸 Lent':'📥 Borrowed'}</span>` : '';
+      return `<div class="exp-item">
         <div class="exp-ico">${cat.icon}</div>
         <div class="exp-body">
           <div class="exp-cat">${cat.label} ${lt}</div>
@@ -659,32 +969,33 @@ function renderHistory(){
         </div>
       </div>`;
     }).join('');
-    return`<div class="dg-head"><span>${dl}</span><span class="dg-total">${fmt(dtot)}</span></div>${items}`;
+    return `<div class="dg-head"><span>${dlabel}</span><span class="dg-total">${fmt(dtot)}</span></div>${items}`;
   }).join('');
 }
 
-/* ─── INSIGHTS ─── */
-function renderInsights(){
-  const me=monthExp(profile.month);
-  const sp=me.reduce((s,e)=>s+e.amount,0);
-  const uniqueDays=[...new Set(me.map(e=>e.date))].length||1;
-  const avg=sp/uniqueDays;
-  const bc={};me.forEach(e=>{bc[e.category]=(bc[e.category]||0)+e.amount;});
-  const srt=Object.entries(bc).sort((a,b)=>b[1]-a[1]);
-  const topCat=srt.length?getCat(srt[0][0]).icon+' '+getCat(srt[0][0]).label:'—';
+/* ════════════════════════════════════════════
+   INSIGHTS
+════════════════════════════════════════════ */
+function renderInsights() {
+  const me = monthExp(profile.month);
+  const sp = me.reduce((s,e)=>s+e.amount,0);
+  const days = [...new Set(me.map(e=>e.date))].length || 1;
+  const bc = {}; me.forEach(e=>{bc[e.category]=(bc[e.category]||0)+e.amount;});
+  const srt = Object.entries(bc).sort((a,b)=>b[1]-a[1]);
+  const topCat = srt.length ? getCat(srt[0][0]).icon+' '+getCat(srt[0][0]).label : '—';
 
-  document.getElementById('insStats').innerHTML=[
-    {v:fmt(sp),l:'Total Spent',c:'var(--accent2)'},
-    {v:fmt(Math.round(avg)),l:'Daily Avg',c:'var(--accent3)'},
-    {v:topCat,l:'Top Category',c:'var(--accent)'},
-    {v:me.length,l:'Transactions',c:'var(--accent4)'},
+  document.getElementById('insStats').innerHTML = [
+    {v:fmt(sp),          l:'Total Spent',    c:'var(--accent2)'},
+    {v:fmt(Math.round(sp/days)), l:'Daily Avg',  c:'var(--accent3)'},
+    {v:topCat,           l:'Top Category',   c:'var(--accent)'},
+    {v:me.length,        l:'Transactions',   c:'var(--accent4)'},
   ].map(s=>`<div class="stat-card"><div class="sv" style="color:${s.c}">${s.v}</div><div class="sl">${s.l}</div></div>`).join('');
 
-  const cb=document.getElementById('catBreak');
-  if(!srt.length){cb.innerHTML=`<div class="empty" style="padding:14px"><p>No data</p></div>`;return;}
-  cb.innerHTML=srt.map(([id,amt])=>{
-    const cat=getCat(id),pct=sp?Math.round((amt/sp)*100):0;
-    return`<div class="cb-item">
+  const cb = document.getElementById('catBreak');
+  if (!srt.length) { cb.innerHTML=`<div class="empty" style="padding:14px"><p>No data</p></div>`; return; }
+  cb.innerHTML = srt.map(([id,amt])=>{
+    const cat=getCat(id), pct=sp?Math.round((amt/sp)*100):0;
+    return `<div class="cb-item">
       <div class="cb-row"><div class="cb-name">${cat.icon}<span>${cat.label}</span></div>
         <div><strong>${fmt(amt)}</strong><span class="cb-pct"> ${pct}%</span></div></div>
       <div class="cb-track"><div class="cb-fill" style="width:${pct}%;background:${cat.color}"></div></div>
@@ -692,24 +1003,25 @@ function renderInsights(){
   }).join('');
 }
 
-/* ─── AI ─── */
-async function fetchAI(){
-  const me=monthExp(profile.month);
-  if(!me.length){showToast('Add expenses first','err');return;}
-  const sp=me.reduce((s,e)=>s+e.amount,0);
-  const bc={};me.forEach(e=>{bc[e.category]=(bc[e.category]||0)+e.amount;});
-  const cs=Object.entries(bc).sort((a,b)=>b[1]-a[1]).map(([id,a])=>`${getCat(id).label}: ৳${a}`).join(', ');
-  const over=sp>profile.budget;
+/* ════════════════════════════════════════════
+   AI INSIGHTS
+════════════════════════════════════════════ */
+async function fetchAI() {
+  const me = monthExp(profile.month);
+  if (!me.length) { showToast('Add expenses first','err'); return; }
+  const sp = me.reduce((s,e)=>s+e.amount,0);
+  const bc={}; me.forEach(e=>{bc[e.category]=(bc[e.category]||0)+e.amount;});
+  const cs = Object.entries(bc).sort((a,b)=>b[1]-a[1]).map(([id,a])=>`${getCat(id).label}: ৳${a}`).join(', ');
+  const over = sp > profile.budget;
 
-  document.getElementById('aiZone').innerHTML=`<div class="loading-dots"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>Analyzing your finances...</div>`;
+  document.getElementById('aiZone').innerHTML = `<div class="loading-dots"><div class="dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>Analyzing your finances...</div>`;
 
-  const prompt=`You are a friendly personal finance advisor for a person in Bangladesh.
-
+  const prompt = `You are a friendly personal finance advisor for a person in Bangladesh.
 Name: ${profile.name}
 Monthly budget: ৳${profile.budget}
 Spent this month: ৳${sp}
 Status: ${over?`OVER budget by ৳${sp-profile.budget}`:`৳${profile.budget-sp} remaining`}
-Spending by category: ${cs}
+Category breakdown: ${cs}
 Days left: ${dLeft(profile.month)}
 
 Respond with exactly 3 sections using these headers (on their own line):
@@ -717,79 +1029,85 @@ Respond with exactly 3 sections using these headers (on their own line):
 💡 Tips to Save Money
 📅 Daily Money Tip
 
-Under each header, write 2-3 short bullet points starting with •. Keep each bullet under 25 words. Be specific to Bangladesh context. Use a friendly tone.`;
+Under each header write 2-3 short bullet points starting with •. Keep each under 25 words. Be specific to Bangladesh context. Friendly tone.`;
 
-  try{
-    const r=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,messages:[{role:'user',content:prompt}]})
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,messages:[{role:'user',content:prompt}]})
     });
-    const data=await r.json();
-    const text=data.content?.map(b=>b.text||'').join('')||'No response.';
-    renderAI(text,over);
-  }catch(e){
-    document.getElementById('aiZone').innerHTML=`<div style="color:var(--accent2);font-size:12px;margin-bottom:10px">Connection failed. Check internet.</div><button class="btn btn-ai" style="width:100%" onclick="fetchAI()">Retry</button>`;
+    const data = await r.json();
+    const text = data.content?.map(b=>b.text||'').join('')||'No response.';
+    renderAI(text, over);
+  } catch(e) {
+    document.getElementById('aiZone').innerHTML = `<div style="color:var(--accent2);font-size:12px;margin-bottom:10px">Connection failed.</div><button class="btn btn-ai" style="width:100%" onclick="fetchAI()">Retry</button>`;
   }
 }
 
-function renderAI(text,over){
-  const lines=text.split('\n').filter(l=>l.trim());
-  let html='';
+function renderAI(text, over) {
+  const lines = text.split('\n').filter(l=>l.trim());
+  let html = '';
   lines.forEach(l=>{
-    const t=l.trim();
-    if(t.startsWith('📊')||t.startsWith('💡')||t.startsWith('📅'))html+=`<div class="ai-sec">${t}</div>`;
-    else if(t.startsWith('•')){
-      const cls=over&&t.toLowerCase().includes('over')?'danger':t.toLowerCase().includes('cut')||t.toLowerCase().includes('reduce')?'warn':'';
-      html+=`<li class="${cls}">${t.slice(1).trim()}</li>`;
+    const t = l.trim();
+    if (t.startsWith('📊')||t.startsWith('💡')||t.startsWith('📅')) html += `<div class="ai-sec-title">${t}</div>`;
+    else if (t.startsWith('•')) {
+      const cls = over&&t.toLowerCase().includes('over')?'danger':t.toLowerCase().includes('cut')||t.toLowerCase().includes('reduc')?'warn':'';
+      html += `<li class="${cls}">${t.slice(1).trim()}</li>`;
     }
   });
-  document.getElementById('aiZone').innerHTML=`<ul class="ai-tips-list">${html}</ul><button class="btn btn-ai" style="width:100%;margin-top:10px" onclick="fetchAI()">🔄 Refresh Analysis</button>`;
+  document.getElementById('aiZone').innerHTML = `<ul class="ai-tips-list">${html}</ul><button class="btn btn-ai" style="width:100%;margin-top:10px" onclick="fetchAI()">🔄 Refresh</button>`;
 }
 
-/* ─── PROFILE ─── */
-function renderProfile(){
-  if(!profile)return;
+/* ════════════════════════════════════════════
+   PROFILE PAGE
+════════════════════════════════════════════ */
+function renderProfilePage() {
+  if (!profile) return;
   // avatar
-  if(profile.avatar){
-    document.getElementById('phImg').src=profile.avatar;
-    document.getElementById('phImg').style.display='block';
-    document.getElementById('phEmoji').style.display='none';
-  }else{document.getElementById('phImg').style.display='none';document.getElementById('phEmoji').style.display='block';}
-  document.getElementById('phName').textContent=profile.name;
+  if (profile.avatar) {
+    document.getElementById('phImg').src = profile.avatar;
+    document.getElementById('phImg').style.display = 'block';
+    document.getElementById('phEmoji').style.display = 'none';
+  } else {
+    document.getElementById('phImg').style.display = 'none';
+    document.getElementById('phEmoji').style.display = 'block';
+  }
+  document.getElementById('phName').textContent  = profile.name;
+  document.getElementById('phEmail').textContent = currentUser?.email || '';
+  document.getElementById('profBudget').value    = profile.budget;
 
-  const allSp=expenses.reduce((s,e)=>s+e.amount,0);
-  const badge=allSp>100000?'💎 Power Tracker':allSp>50000?'🏆 Pro Tracker':allSp>10000?'⭐ Active Tracker':'🌱 Getting Started';
-  document.getElementById('phBadge').textContent=badge;
-  document.getElementById('profBudget').value=profile.budget;
+  const allSp = expenses.reduce((s,e)=>s+e.amount,0);
+  const badge = allSp>100000?'💎 Power Tracker':allSp>50000?'🏆 Pro Tracker':allSp>10000?'⭐ Active Tracker':'🌱 Getting Started';
+  document.getElementById('phBadge').textContent = badge;
 
   // all-time stats
-  const months=[...new Set(expenses.map(e=>e.month))];
-  const tot=expenses.reduce((s,e)=>s+e.amount,0);
-  const avgM=months.length?Math.round(tot/months.length):0;
-  const maxM=months.length?Math.max(...months.map(m=>totSpent(m))):0;
-  document.getElementById('allStats').innerHTML=[
-    {v:fmt(tot),l:'All-Time Spent',c:'var(--accent2)'},
-    {v:expenses.length,l:'Total Transactions',c:'var(--accent4)'},
-    {v:fmt(avgM),l:'Avg Monthly',c:'var(--accent3)'},
-    {v:fmt(maxM),l:'Highest Month',c:'var(--accent)'},
+  const months = [...new Set(expenses.map(e=>e.month))];
+  const avgM   = months.length ? Math.round(allSp/months.length) : 0;
+  const maxM   = months.length ? Math.max(...months.map(m=>totSpent(m))) : 0;
+  document.getElementById('allStats').innerHTML = [
+    {v:fmt(allSp),   l:'All-Time Spent',    c:'var(--accent2)'},
+    {v:expenses.length, l:'Total Transactions', c:'var(--accent4)'},
+    {v:fmt(avgM),    l:'Avg Monthly',       c:'var(--accent3)'},
+    {v:fmt(maxM),    l:'Highest Month',     c:'var(--accent)'},
   ].map(s=>`<div class="as-card"><div class="as-v" style="color:${s.c}">${s.v}</div><div class="as-l">${s.l}</div></div>`).join('');
 
   // category manage
-  document.getElementById('catManage').innerHTML=categories.map(c=>`
+  document.getElementById('catManage').innerHTML = categories.map(c=>`
     <div class="cmi">
-      <div class="cmi-icon">${c.icon}</div>
+      <div class="cmi-ico">${c.icon}</div>
       <div class="cmi-name">${c.label}</div>
       <button class="cmi-del${c.locked?' locked':''}" onclick="${c.locked?`showToast('Default — cannot delete','err')`:`removeCategory('${c.id}')`}">
-        ${c.locked?'🔒':'✕'}</button>
+        ${c.locked?'🔒':'✕'}
+      </button>
     </div>`).join('');
 
   // monthly history
-  const mh=document.getElementById('monthHist');
-  const smonths=[...new Set(expenses.map(e=>e.month))].sort((a,b)=>b.localeCompare(a));
-  if(!smonths.length){mh.innerHTML='<div style="color:var(--muted);font-size:12px">No history yet</div>';return;}
-  mh.innerHTML=smonths.map(m=>{
-    const sp=totSpent(m),pct=Math.min(sp/profile.budget*100,100),ov=sp>profile.budget;
-    return`<div class="mh-item">
+  const mh = document.getElementById('monthHist');
+  const smonths = [...new Set(expenses.map(e=>e.month))].sort((a,b)=>b.localeCompare(a));
+  if (!smonths.length) { mh.innerHTML='<div style="color:var(--muted);font-size:12px">No history yet</div>'; return; }
+  mh.innerHTML = smonths.map(m=>{
+    const sp=totSpent(m), pct=Math.min(sp/profile.budget*100,100), ov=sp>profile.budget;
+    return `<div class="mh-item">
       <div><div class="mh-label">${mLabel(m)}</div>
         <div class="mh-prog"><div class="mh-pfill" style="width:${pct}%;background:${ov?'var(--accent2)':'var(--accent)'}"></div></div>
       </div>
@@ -798,78 +1116,115 @@ function renderProfile(){
   }).join('');
 }
 
-async function saveProfBudget(){
-  const b=parseFloat(document.getElementById('profBudget').value);
-  if(!b||b<1){showToast('Invalid budget','err');return;}
-  profile.budget=b;await dbPut('profile',profile);updateAll();showToast('Budget updated ✓','ok');
+async function saveProfBudget() {
+  const b = parseFloat(document.getElementById('profBudget').value);
+  if (!b||b<1) { showToast('Invalid budget','err'); return; }
+  profile.budget = b;
+  await sb.from('profiles').update({budget:b}).eq('user_id', currentUser.id);
+  updateAll(); showToast('Budget updated ✓','ok');
 }
 
-async function addCustomCat(){
-  const emoji=document.getElementById('newEmoji').value.trim()||'📌';
-  const name=document.getElementById('newCatName').value.trim();
-  if(!name){showToast('Enter category name','err');return;}
-  if(categories.find(c=>c.label.toLowerCase()===name.toLowerCase())){showToast('Already exists','err');return;}
-  const id='c_'+Date.now();
-  const colors=['#a78bfa','#34d399','#f472b6','#38bdf8','#fb923c','#facc15','#e879f9'];
-  const color=colors[Math.floor(Math.random()*colors.length)];
-  const cat={id,label:name,icon:emoji,color,locked:false};
-  categories.push(cat);await dbPut('categories',cat);
-  document.getElementById('newEmoji').value='';document.getElementById('newCatName').value='';
-  renderProfile();renderCatGrid();showToast(`"${name}" added ✓`,'ok');
+async function addCustomCat() {
+  const emoji = document.getElementById('newEmoji').value.trim() || '📌';
+  const name  = document.getElementById('newCatName').value.trim();
+  if (!name) { showToast('Enter category name','err'); return; }
+  if (categories.find(c=>c.label.toLowerCase()===name.toLowerCase())) { showToast('Already exists','err'); return; }
+  const colors = ['#a78bfa','#34d399','#f472b6','#38bdf8','#fb923c','#facc15'];
+  const color  = colors[Math.floor(Math.random()*colors.length)];
+  const rec = {id:'c_'+Date.now(), label:name, icon:emoji, color, locked:false, user_id:currentUser.id};
+  const { data, error } = await sb.from('categories').insert(rec).select().single();
+  if (error) { showToast('Error: '+error.message,'err'); return; }
+  categories.push(data||rec);
+  document.getElementById('newEmoji').value = '';
+  document.getElementById('newCatName').value = '';
+  renderProfilePage(); renderCatGrid();
+  showToast(`"${name}" added ✓`,'ok');
 }
 
-async function removeCategory(id){
-  if(expenses.some(e=>e.category===id)){showToast('Has expenses — cannot delete','err');return;}
-  categories=categories.filter(c=>c.id!==id);await dbDel('categories',id);
-  renderProfile();renderCatGrid();showToast('Category removed','ok');
+async function removeCategory(id) {
+  if (expenses.some(e=>e.category===id)) { showToast('Has expenses — cannot delete','err'); return; }
+  await sb.from('categories').delete().eq('id',id).eq('user_id',currentUser.id);
+  categories = categories.filter(c=>c.id!==id);
+  renderProfilePage(); renderCatGrid();
+  showToast('Category removed','ok');
 }
 
-/* ─── MODALS ─── */
-function openBudgetModal(){
-  document.getElementById('mMonth').value=profile.month;
-  document.getElementById('mBudget').value=profile.budget;
+/* ════════════════════════════════════════════
+   MODALS
+════════════════════════════════════════════ */
+function openBudgetModal() {
+  document.getElementById('mMonth').value  = profile.month;
+  document.getElementById('mBudget').value = profile.budget;
   document.getElementById('budgetModal').classList.remove('hidden');
 }
-async function saveBudgetModal(){
-  const m=document.getElementById('mMonth').value,b=parseFloat(document.getElementById('mBudget').value);
-  if(!m||!b||b<1){showToast('Fill all fields','err');return;}
-  profile.month=m;profile.budget=b;await dbPut('profile',profile);
-  updateTopbar();updateAll();closeModal('budgetModal');showToast('Saved ✓','ok');
+async function saveBudgetModal() {
+  const m = document.getElementById('mMonth').value;
+  const b = parseFloat(document.getElementById('mBudget').value);
+  if (!m||!b||b<1) { showToast('Fill all fields','err'); return; }
+  profile.month = m; profile.budget = b;
+  await sb.from('profiles').update({month:m, budget:b}).eq('user_id', currentUser.id);
+  updateTopbar(); updateAll(); closeModal('budgetModal');
+  showToast('Saved ✓','ok');
 }
-function closeModal(id){document.getElementById(id).classList.add('hidden');}
+function openEditProfile() {
+  document.getElementById('editName').value  = profile.name;
+  document.getElementById('editMonth').value = profile.month;
+  document.getElementById('editModal').classList.remove('hidden');
+}
+async function saveEditProfile() {
+  const n = document.getElementById('editName').value.trim();
+  const m = document.getElementById('editMonth').value;
+  if (!n) { showToast('Enter your name','err'); return; }
+  profile.name = n; profile.month = m;
+  await sb.from('profiles').update({name:n, month:m}).eq('user_id', currentUser.id);
+  updateTopbar(); renderProfilePage(); closeModal('editModal');
+  showToast('Profile updated ✓','ok');
+}
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
 
-/* ─── TABS ─── */
-function switchTab(t){
-  activeTab=t;
-  ['add','history','insights'].forEach(tab=>{document.getElementById('tab-'+tab).style.display=tab===t?'block':'none';});
+/* ════════════════════════════════════════════
+   TABS
+════════════════════════════════════════════ */
+function switchTab(t) {
+  activeTab = t;
+  ['add','history','insights'].forEach(tab=>{
+    document.getElementById('tab-'+tab).style.display = tab===t?'block':'none';
+  });
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['add','history','insights'][i]===t));
-  if(t==='history')renderHistory();
-  if(t==='insights')renderInsights();
+  if (t==='history')  renderHistory();
+  if (t==='insights') renderInsights();
 }
 
-/* ─── DATA ─── */
-function exportData(){
-  const blob=new Blob([JSON.stringify({profile,categories,expenses},null,2)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
-  a.download=`takatrack_${todayStr()}.json`;a.click();showToast('Backup downloaded ✓','ok');
-}
-function confirmReset(){
-  if(confirm('Reset ALL data? This cannot be undone!'))indexedDB.deleteDatabase(DB_NAME),location.reload();
-}
-
-/* ─── HELPERS ─── */
-function updateAll(){
-  if(!profile)return;
-  updateTopbar();updateHero();updateChips();
-  if(activeTab==='history')renderHistory();
-  if(activeTab==='insights')renderInsights();
-}
-function showToast(msg,type){
-  const t=document.getElementById('toast');
-  t.textContent=msg;t.className='toast show'+(type?' '+type:'');
-  clearTimeout(t._t);t._t=setTimeout(()=>{t.className='toast';},2600);
+/* ════════════════════════════════════════════
+   DATA EXPORT
+════════════════════════════════════════════ */
+function exportData() {
+  const blob = new Blob([JSON.stringify({profile,categories,expenses},null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `takatrack_${todayStr()}.json`;
+  a.click();
+  showToast('Backup downloaded ✓','ok');
 }
 
+/* ════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════ */
+function updateAll() {
+  if (!profile) return;
+  updateTopbar(); updateHero(); updateChips();
+  if (activeTab==='history')  renderHistory();
+  if (activeTab==='insights') renderInsights();
+}
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show'+(type?' '+type:'');
+  clearTimeout(t._t); t._t = setTimeout(()=>{t.className='toast';}, 2600);
+}
+
+/* ════════════════════════════════════════════
+   START
+════════════════════════════════════════════ */
 init();
 </script>
 </body>
